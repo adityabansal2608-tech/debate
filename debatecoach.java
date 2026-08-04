@@ -11,15 +11,20 @@ import java.nio.charset.StandardCharsets;
 
 public class debatecoach {
 
-    static final String GROQ_API_KEY = System.getenv("GROQ_API_KEY") != null ? 
-            System.getenv("GROQ_API_KEY") : "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";
+    // Securely read API Key from Environment Variable set in Railway dashboard
+    static final String GROQ_API_KEY = System.getenv("GROQ_API_KEY");
 
     public static void main(String[] args) throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+        // Read dynamic PORT assigned by Railway (fallback to 8080 for local dev)
+        String envPort = System.getenv("PORT");
+        int port = (envPort != null) ? Integer.parseInt(envPort) : 8080;
+
+        // Bind to 0.0.0.0 to accept external cloud requests
+        HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
         server.createContext("/critique", debatecoach::handleCritique);
         server.setExecutor(null);
         server.start();
-        System.out.println("Server running at http://localhost:8080/critique");
+        System.out.println("Server running on port " + port);
     }
 
     static void handleCritique(HttpExchange exchange) throws IOException {
@@ -63,6 +68,10 @@ public class debatecoach {
     }
 
     static String getCritiqueFromGroq(String argument) throws Exception {
+        if (GROQ_API_KEY == null || GROQ_API_KEY.isEmpty()) {
+            throw new RuntimeException("GROQ_API_KEY environment variable is not set!");
+        }
+
         String systemPrompt = "You are an expert debate coach. Analyze the argument and output JSON with keys: 'score' (1-10), 'fallacies' (array of {quote, type, explanation}), 'weak_points' (array), and 'strong_points' (array).";
 
         String jsonPayload = """
