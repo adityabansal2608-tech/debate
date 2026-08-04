@@ -8,11 +8,31 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class debatecoach {
 
     // Securely read API Key from Environment Variable set in Railway dashboard
     static final String GROQ_API_KEY = System.getenv("GROQ_API_KEY");
+
+    // --- Simple in-memory rate limiter: max 10 requests/minute per IP ---
+    static final int MAX_REQUESTS_PER_WINDOW = 10;
+    static final long WINDOW_MILLIS = 60_000;
+    static final Map<String, long[]> requestLog = new ConcurrentHashMap<>(); // ip -> [windowStart, count]
+
+    static boolean isRateLimited(String ip) {
+        long now = System.currentTimeMillis();
+        long[] entry = requestLog.computeIfAbsent(ip, k -> new long[]{now, 0});
+        synchronized (entry) {
+            if (now - entry[0] > WINDOW_MILLIS) {
+                entry[0] = now;
+                entry[1] = 0;
+            }
+            entry[1]++;
+            return entry[1] > MAX_REQUESTS_PER_WINDOW;
+        }
+    }
 
     public static void main(String[] args) throws Exception {
         // Read dynamic PORT assigned by Railway (fallback to 8080 for local dev)
@@ -28,7 +48,7 @@ public class debatecoach {
     }
 
     static void handleCritique(HttpExchange exchange) throws IOException {
-        exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "https://logiclensproject.netlify.app");
         exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "POST, OPTIONS");
         exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
 
@@ -39,6 +59,18 @@ public class debatecoach {
 
         if (!exchange.getRequestMethod().equalsIgnoreCase("POST")) {
             exchange.sendResponseHeaders(405, -1);
+            return;
+        }
+
+        String clientIp = exchange.getRemoteAddress().getAddress().getHostAddress();
+        if (isRateLimited(clientIp)) {
+            String error = "{\"error\": \"Too many requests. Please wait a minute and try again.\"}";
+            byte[] errorBytes = error.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(429, errorBytes.length);
+            OutputStream os = exchange.getResponseBody();
+            os.write(errorBytes);
+            os.close();
             return;
         }
 
@@ -56,8 +88,9 @@ public class debatecoach {
             os.write(responseBytes);
             os.close();
         } catch (Exception e) {
+            // Log full detail server-side only; never leak internals to the client
             e.printStackTrace();
-            String error = "{\"error\": \"" + escapeJson(e.getMessage()) + "\"}";
+            String error = "{\"error\": \"Something went wrong processing your request. Please try again.\"}";
             byte[] errorBytes = error.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(500, errorBytes.length);
@@ -86,11 +119,14 @@ public class debatecoach {
             }
             """.formatted(escapeJson(systemPrompt), escapeJson(argument));
 
-        HttpClient client = HttpClient.newHttpClient();
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(10))
+                .build();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://api.groq.com/openai/v1/chat/completions"))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + GROQ_API_KEY)
+                .timeout(java.time.Duration.ofSeconds(20))
                 .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                 .build();
 

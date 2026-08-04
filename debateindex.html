@@ -54,22 +54,30 @@
         const contentString = groqData.choices[0].message.content;
         const data = JSON.parse(contentString);
 
+        // Escape any text before inserting into innerHTML, to prevent XSS
+        // if the model ever echoes back HTML/script content.
+        function escapeHtml(str) {
+          const div = document.createElement('div');
+          div.textContent = String(str ?? '');
+          return div.innerHTML;
+        }
+
         // Render formatted feedback
-        let html = `<h2>Score: ${data.score || 0}/10</h2>`;
-        
+        let html = `<h2>Score: ${escapeHtml(data.score || 0)}/10</h2>`;
+
         if (data.strong_points && data.strong_points.length > 0) {
-          html += `<h3>Strong Points:</h3><ul>` + 
-            data.strong_points.map(p => `<li>${p}</li>`).join('') + `</ul>`;
+          html += `<h3>Strong Points:</h3><ul>` +
+            data.strong_points.map(p => `<li>${escapeHtml(p)}</li>`).join('') + `</ul>`;
         }
 
         if (data.weak_points && data.weak_points.length > 0) {
-          html += `<h3>Weak Points:</h3><ul>` + 
-            data.weak_points.map(p => `<li>${p}</li>`).join('') + `</ul>`;
+          html += `<h3>Weak Points:</h3><ul>` +
+            data.weak_points.map(p => `<li>${escapeHtml(p)}</li>`).join('') + `</ul>`;
         }
 
         if (data.fallacies && data.fallacies.length > 0) {
-          html += `<h3>Fallacies Detected:</h3><ul>` + 
-            data.fallacies.map(f => `<li><b>${f.type}:</b> "${f.quote}" — ${f.explanation}</li>`).join('') + `</ul>`;
+          html += `<h3>Fallacies Detected:</h3><ul>` +
+            data.fallacies.map(f => `<li><b>${escapeHtml(f.type)}:</b> "${escapeHtml(f.quote)}" — ${escapeHtml(f.explanation)}</li>`).join('') + `</ul>`;
         }
 
         resultsDiv.innerHTML = html;
