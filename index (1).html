@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LogicLens — AI Debate Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #14172c;
+    --ink-elevated: #1c2044;
+    --ink-elevated-2: #242a56;
+    --paper: #f4efe4;
+    --paper-line: rgba(20,23,44,0.08);
+    --text: #eae6da;
+    --text-dim: rgba(234,230,218,0.62);
+    --gold: #c9a227;
+    --gold-bright: #e6c34a;
+    --red: #c1443c;
+    --red-bright: #e0685f;
+    --green: #4f9877;
+    --green-bright: #6bbd99;
+    --rule: rgba(234,230,218,0.12);
+    --radius: 14px;
+    --mx: 50%;
+    --my: 0%;
+  }
+
+  * { box-sizing: border-box; }
+  ::selection { background: rgba(201,162,39,0.35); color: var(--text); }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--ink);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* ---------- Ambient layers ---------- */
+  .spotlight {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: radial-gradient(600px circle at var(--mx) var(--my), rgba(201,162,39,0.08), transparent 60%);
+    transition: background 0.15s ease-out;
+  }
+  .ambient {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(201,162,39,0.10), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 100%, rgba(79,152,119,0.07), transparent);
+  }
+  .grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+
+  .page {
+    position: relative;
+    z-index: 2;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 32px 24px 100px;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 24px;
+  }
+  .history-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(234,230,218,0.05);
+    border: 1px solid var(--rule);
+    color: var(--text-dim);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .history-btn:hover { background: rgba(234,230,218,0.09); color: var(--text); }
+  .history-btn svg { width: 15px; height: 15px; }
+  .history-badge {
+    background: var(--gold-bright);
+    color: #1a1400;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 999px;
+    display: none;
+  }
+  .history-badge.show { display: inline-block; }
+
+  /* ---------- Hero ---------- */
+  .hero { text-align: center; margin-bottom: 36px; }
+
+  .mark {
+    width: 56px; height: 56px;
+    margin: 0 auto 20px;
+    opacity: 0;
+    animation: rise 0.7s cubic-bezier(.16,1,.3,1) forwards;
+  }
+  .mark svg { width: 100%; height: 100%; }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold-bright);
+    margin: 0 0 10px;
+    opacity: 0;
+    animation: rise 0.7s cubic-bezier(.16,1,.3,1) 0.08s forwards;
+  }
+
+  h1.wordmark {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: clamp(2.4rem, 7vw, 3.2rem);
+    letter-spacing: -0.01em;
+    margin: 0 0 14px;
+    color: var(--text);
+    opacity: 0;
+    animation: rise 0.7s cubic-bezier(.16,1,.3,1) 0.16s forwards;
+  }
+  h1.wordmark em { font-style: italic; color: var(--gold-bright); }
+
+  .tagline {
+    font-size: 1.02rem;
+    color: var(--text-dim);
+    max-width: 420px;
+    margin: 0 auto 22px;
+    opacity: 0;
+    animation: rise 0.7s cubic-bezier(.16,1,.3,1) 0.24s forwards;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    opacity: 0;
+    animation: rise 0.7s cubic-bezier(.16,1,.3,1) 0.32s forwards;
+  }
+  .chip {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    background: rgba(234,230,218,0.04);
+    border: 1px solid var(--rule);
+    padding: 7px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .chip:hover { background: rgba(234,230,218,0.08); color: var(--text); border-color: rgba(234,230,218,0.24); }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- Composer (legal pad) ---------- */
+  .composer { margin-top: 32px; }
+
+  .pad {
+    position: relative;
+    background: var(--paper);
+    border-radius: var(--radius);
+    padding: 26px 24px 20px 46px;
+    box-shadow: 0 20px 50px -20px rgba(0,0,0,0.5), 0 2px 0 rgba(0,0,0,0.04);
+    border-left: 3px solid var(--red);
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  }
+  .pad:focus-within {
+    box-shadow: 0 24px 60px -18px rgba(0,0,0,0.55), 0 0 0 3px rgba(201,162,39,0.28);
+    transform: translateY(-1px);
+  }
+  .pad::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
+    background-image: repeating-linear-gradient(
+      to bottom, transparent, transparent 27px, var(--paper-line) 28px
+    );
+    pointer-events: none;
+  }
+
+  textarea#argument {
+    position: relative;
+    width: 100%;
+    min-height: 140px;
+    border: none;
+    outline: none;
+    resize: vertical;
+    background: transparent;
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    font-size: 1.02rem;
+    line-height: 28px;
+    padding: 0;
+    display: block;
+  }
+  textarea#argument::placeholder { color: rgba(20,23,44,0.38); }
+
+  .pad-footer {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: rgba(20,23,44,0.4);
+  }
+  .kbd-hint {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .kbd-hint kbd {
+    font-family: 'JetBrains Mono', monospace;
+    background: rgba(20,23,44,0.08);
+    border: 1px solid rgba(20,23,44,0.14);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.68rem;
+  }
+
+  /* ---------- Controls ---------- */
+  .controls { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+
+  .btn {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.94rem;
+    font-weight: 600;
+    padding: 12px 22px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  .btn-primary {
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+    color: #1a1400;
+    box-shadow: 0 8px 24px -8px rgba(201,162,39,0.55);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 28px -8px rgba(201,162,39,0.65); }
+
+  .btn-ghost {
+    background: rgba(234,230,218,0.05);
+    color: var(--text);
+    border-color: var(--rule);
+  }
+  .btn-ghost:hover { background: rgba(234,230,218,0.09); border-color: rgba(234,230,218,0.24); }
+  .btn-ghost.listening { border-color: var(--red); color: var(--red-bright); }
+
+  .pulse-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--red-bright);
+    display: none;
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+  .btn-ghost.listening .pulse-dot { display: inline-block; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.4); }
+  }
+
+  .btn-outline {
+    background: transparent;
+    color: var(--gold-bright);
+    border-color: rgba(201,162,39,0.4);
+    font-size: 0.85rem;
+    padding: 9px 16px;
+  }
+  .btn-outline:hover { background: rgba(201,162,39,0.08); }
+
+  /* ---------- Results ---------- */
+  #results { margin-top: 44px; }
+  #results:empty { margin-top: 0; }
+
+  .result-card { animation: reveal 0.5s cubic-bezier(.16,1,.3,1) forwards; }
+  @keyframes reveal {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .placeholder-hint { text-align: center; color: var(--text-dim); font-size: 0.92rem; }
+
+  .scan { text-align: center; padding: 30px 0 10px; }
+  .scan-track {
+    position: relative;
+    height: 2px;
+    background: repeating-linear-gradient(to right, var(--rule) 0, var(--rule) 6px, transparent 6px, transparent 12px);
+    margin: 0 auto 18px;
+    max-width: 280px;
+  }
+  .scan-lens {
+    position: absolute; top: 50%; left: 0;
+    width: 22px; height: 22px;
+    transform: translate(-50%, -50%);
+    animation: sweep 1.6s ease-in-out infinite;
+  }
+  .scan-lens svg { width: 100%; height: 100%; color: var(--gold-bright); }
+  @keyframes sweep { 0% { left: 6%; } 50% { left: 94%; } 100% { left: 6%; } }
+  .scan-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 20px; }
+  .gauge {
+    --pct: 0;
+    width: 168px; height: 168px;
+    border-radius: 50%;
+    background: conic-gradient(var(--gauge-color, var(--gold-bright)) calc(var(--pct) * 1%), rgba(234,230,218,0.08) 0);
+    display: grid;
+    place-items: center;
+    position: relative;
+  }
+  .gauge::before {
+    content: '';
+    position: absolute;
+    inset: 12px;
+    border-radius: 50%;
+    background: var(--ink-elevated);
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .gauge-inner { position: relative; z-index: 1; text-align: center; }
+  .gauge-score { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 2.6rem; color: var(--text); line-height: 1; }
+  .gauge-max { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--text-dim); }
+  .gauge-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .action-row { display: flex; justify-content: center; gap: 8px; margin-bottom: 32px; flex-wrap: wrap; }
+
+  .section-block { margin-bottom: 28px; }
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .dot-green { background: var(--green-bright); }
+  .dot-red { background: var(--red-bright); }
+
+  ul.point-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  ul.point-list li {
+    background: var(--ink-elevated);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 0.95rem;
+    border-left: 3px solid var(--rule);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  ul.point-list li:hover { transform: translateX(2px); background: var(--ink-elevated-2); }
+  ul.point-list.strong li { border-left-color: var(--green-bright); }
+  ul.point-list.weak li { border-left-color: var(--red-bright); }
+
+  .fallacy-card {
+    background: var(--ink-elevated);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+    border-left: 3px solid var(--red);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .fallacy-card:hover { transform: translateX(2px); background: var(--ink-elevated-2); }
+  .fallacy-type {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--red-bright);
+    background: rgba(193,68,60,0.14);
+    padding: 3px 9px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  .fallacy-quote { font-style: italic; color: var(--text); margin: 0 0 6px; }
+  .fallacy-explanation { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+
+  .error-box {
+    background: rgba(193,68,60,0.1);
+    border: 1px solid rgba(193,68,60,0.3);
+    color: var(--red-bright);
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+  }
+
+  .notice-box {
+    background: rgba(201,162,39,0.1);
+    border: 1px solid rgba(201,162,39,0.3);
+    color: var(--gold-bright);
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+  }
+
+  .shared-banner {
+    background: rgba(234,230,218,0.05);
+    border: 1px solid var(--rule);
+    color: var(--text-dim);
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .shared-banner a { color: var(--gold-bright); text-decoration: none; font-weight: 600; }
+  .shared-banner a:hover { text-decoration: underline; }
+
+  /* ---------- History drawer ---------- */
+  .drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,11,22,0.55);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 10;
+  }
+  .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  .drawer {
+    position: fixed;
+    top: 0; right: 0;
+    height: 100%;
+    width: min(360px, 88vw);
+    background: var(--ink-elevated);
+    border-left: 1px solid var(--rule);
+    z-index: 11;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(.16,1,.3,1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: -30px 0 60px -20px rgba(0,0,0,0.5);
+  }
+  .drawer.open { transform: translateX(0); }
+
+  .drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .drawer-header h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.2rem;
+    margin: 0;
+    font-weight: 600;
+  }
+  .drawer-close {
+    background: none; border: none; color: var(--text-dim);
+    cursor: pointer; padding: 4px; display: flex;
+  }
+  .drawer-close svg { width: 20px; height: 20px; }
+  .drawer-close:hover { color: var(--text); }
+
+  .drawer-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+  .drawer-empty { color: var(--text-dim); font-size: 0.9rem; text-align: center; padding: 40px 20px; }
+
+  .history-item {
+    background: var(--ink-elevated-2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+    border-left: 3px solid var(--rule);
+  }
+  .history-item:hover { transform: translateX(-2px); background: #2c3266; }
+  .history-item-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .history-score {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .history-time { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-dim); }
+  .history-snippet {
+    font-size: 0.86rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .drawer-footer { padding: 14px 20px; border-top: 1px solid var(--rule); }
+  .clear-history-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--rule);
+    color: var(--text-dim);
+    padding: 9px;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .clear-history-btn:hover { border-color: var(--red-bright); color: var(--red-bright); }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--ink-elevated-2);
+    border: 1px solid var(--rule);
+    color: var(--text);
+    padding: 12px 20px;
+    border-radius: 999px;
+    font-size: 0.88rem;
+    box-shadow: 0 12px 30px -10px rgba(0,0,0,0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast svg { width: 15px; height: 15px; color: var(--green-bright); flex-shrink: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001s !important; animation-iteration-count: 1 !important; transition: none !important; }
+  }
+
+  @media (max-width: 480px) {
+    .page { padding: 24px 16px 80px; }
+    .pad { padding: 22px 18px 18px 36px; }
+    .kbd-hint { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="ambient"></div>
+  <div class="spotlight" id="spotlight"></div>
+  <div class="grain"></div>
+
+  <div class="page">
+    <div class="topbar">
+      <button class="history-btn" onclick="openDrawer()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+        History
+        <span class="history-badge" id="historyBadge">0</span>
+      </button>
+    </div>
+
+    <header class="hero">
+      <div class="mark">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="14" stroke="#c9a227" stroke-width="3"/>
+          <line x1="30" y1="30" x2="43" y2="43" stroke="#c9a227" stroke-width="3.5" stroke-linecap="round"/>
+          <path d="M14 20a6 6 0 0 1 6-6" stroke="#e6c34a" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <p class="eyebrow">Debate Coach</p>
+      <h1 class="wordmark">Logic<em>Lens</em></h1>
+      <p class="tagline">Write or speak your argument. We'll find where the logic bends.</p>
+      <div class="chips">
+        <button class="chip" onclick="fillExample(0)">Social media bans</button>
+        <button class="chip" onclick="fillExample(1)">Four-day work week</button>
+        <button class="chip" onclick="fillExample(2)">Nuclear energy</button>
+      </div>
+    </header>
+
+    <section class="composer">
+      <div class="pad">
+        <textarea id="argument" placeholder="Type your argument here, or use the mic below…" oninput="updateCharCount()"></textarea>
+        <div class="pad-footer">
+          <span class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to analyze</span>
+          <span id="charCount">0 characters</span>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="micBtn" class="btn btn-ghost" onclick="toggleListening()">
+          <span class="pulse-dot"></span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          <span id="micLabel">Speak Argument</span>
+        </button>
+        <button class="btn btn-primary" onclick="critique()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Analyze Argument
+        </button>
+        <button class="btn btn-ghost" onclick="runDebate()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="M15 5l4 4"/></svg>
+          Let 2 AIs Debate It
+        </button>
+      </div>
+    </section>
+
+    <div id="results" aria-live="polite"></div>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDrawer()"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <h2>Recent Critiques</h2>
+      <button class="drawer-close" onclick="closeDrawer()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="drawer-list" id="drawerList"></div>
+    <div class="drawer-footer">
+      <button class="clear-history-btn" onclick="clearHistory()">Clear History</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const BACKEND_URL = "https://debate-ujzp.onrender.com/critique";
+    const DEBATE_URL = BACKEND_URL.replace("/critique", "/debate");
+    const HISTORY_KEY = "logiclens_history";
+    const MAX_HISTORY = 8;
+    let lastCritiqueData = null;
+    let lastCritiqueArgument = "";
+
+    const EXAMPLES = [
+      "Social media should be banned for anyone under 18 because it's clearly the main cause of rising teen anxiety, and if it worked for my cousin who quit and felt happier, it'll work for everyone.",
+      "Every company should switch to a four-day work week since productivity studies show output stays the same, and any manager who disagrees is just stuck in outdated thinking.",
+      "Nuclear energy is too dangerous to invest in because of Chernobyl and Fukushima, and countries that build more reactors are clearly ignoring the lessons of history.",
+    ];
+
+    function fillExample(i) {
+      document.getElementById("argument").value = EXAMPLES[i];
+      updateCharCount();
+      document.getElementById("argument").focus();
+    }
+
+    function updateCharCount() {
+      const len = document.getElementById("argument").value.length;
+      document.getElementById("charCount").textContent = `${len} character${len === 1 ? '' : 's'}`;
+    }
+
+    // ---------- Cursor spotlight ----------
+    document.addEventListener("mousemove", (e) => {
+      document.documentElement.style.setProperty('--mx', e.clientX + 'px');
+      document.documentElement.style.setProperty('--my', e.clientY + 'px');
+    });
+
+    // ---------- Toast ----------
+    let toastTimer = null;
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${message}`;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 2400);
+    }
+
+    // ---------- History (localStorage) ----------
+    function getHistory() {
+      try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+      catch { return []; }
+    }
+
+    function saveToHistory(argument, data) {
+      const history = getHistory();
+      history.unshift({ id: Date.now(), argument, data, timestamp: new Date().toISOString() });
+      const trimmed = history.slice(0, MAX_HISTORY);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed));
+      renderHistoryBadge();
+    }
+
+    function renderHistoryBadge() {
+      const count = getHistory().length;
+      const badge = document.getElementById("historyBadge");
+      badge.textContent = count;
+      badge.classList.toggle("show", count > 0);
+    }
+
+    function scoreColorClass(score) {
+      if (score <= 3) return 'background: rgba(193,68,60,0.18); color: var(--red-bright);';
+      if (score <= 6) return 'background: rgba(201,162,39,0.18); color: var(--gold-bright);';
+      return 'background: rgba(79,152,119,0.18); color: var(--green-bright);';
+    }
+
+    function timeAgo(iso) {
+      const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+      if (diff < 60) return 'just now';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return Math.floor(diff / 86400) + 'd ago';
+    }
+
+    function renderDrawerList() {
+      const history = getHistory();
+      const list = document.getElementById("drawerList");
+      if (history.length === 0) {
+        list.innerHTML = `<p class="drawer-empty">No critiques yet. Analyze an argument and it'll show up here.</p>`;
+        return;
+      }
+      list.innerHTML = history.map(entry => `
+        <div class="history-item" onclick="restoreHistory(${entry.id})">
+          <div class="history-item-top">
+            <span class="history-score" style="${scoreColorClass(Number(entry.data.score) || 0)}">${entry.data.score || 0}/10</span>
+            <span class="history-time">${timeAgo(entry.timestamp)}</span>
+          </div>
+          <p class="history-snippet">${escapeHtml(entry.argument)}</p>
+        </div>`).join('');
+    }
+
+    function restoreHistory(id) {
+      const entry = getHistory().find(e => e.id === id);
+      if (!entry) return;
+      document.getElementById("argument").value = entry.argument;
+      updateCharCount();
+      lastCritiqueData = entry.data;
+      lastCritiqueArgument = entry.argument;
+      renderResults(entry.data, false);
+      closeDrawer();
+    }
+
+    function clearHistory() {
+      localStorage.removeItem(HISTORY_KEY);
+      renderHistoryBadge();
+      renderDrawerList();
+      showToast("History cleared");
+    }
+
+    function openDrawer() {
+      renderDrawerList();
+      document.getElementById("drawer").classList.add("open");
+      document.getElementById("drawerBackdrop").classList.add("open");
+    }
+    function closeDrawer() {
+      document.getElementById("drawer").classList.remove("open");
+      document.getElementById("drawerBackdrop").classList.remove("open");
+    }
+
+    // ---------- Audio Input: Speech-to-Text ----------
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let isListening = false;
+
+    if (SpeechRecognitionAPI) {
+      recognition = new SpeechRecognitionAPI();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        document.getElementById("argument").value = transcript;
+        updateCharCount();
+      };
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        stopListening();
+      };
+      recognition.onend = () => stopListening();
+    }
+
+    function toggleListening() {
+      if (!SpeechRecognitionAPI) {
+        alert("Speech recognition isn't supported in this browser. Try Chrome on desktop or Android.");
+        return;
+      }
+      if (isListening) {
+        recognition.stop();
+      } else {
+        document.getElementById("argument").value = "";
+        recognition.start();
+        isListening = true;
+        document.getElementById("micBtn").classList.add("listening");
+        document.getElementById("micLabel").textContent = "Stop Listening";
+      }
+    }
+
+    function stopListening() {
+      isListening = false;
+      const micBtn = document.getElementById("micBtn");
+      if (micBtn) {
+        micBtn.classList.remove("listening");
+        document.getElementById("micLabel").textContent = "Speak Argument";
+      }
+    }
+
+    // ---------- Audio Output: Text-to-Speech ----------
+    function buildSpokenScript(data) {
+      let script = `Your score is ${data.score || 0} out of 10. `;
+      if (data.strong_points?.length) script += "Strong points: " + data.strong_points.join(". ") + ". ";
+      if (data.weak_points?.length) script += "Weak points: " + data.weak_points.join(". ") + ". ";
+      if (data.fallacies?.length) script += "Fallacies detected: " + data.fallacies.map(f => `${f.type}: ${f.explanation}`).join(". ") + ".";
+      return script;
+    }
+
+    function readCritiqueAloud() {
+      if (!lastCritiqueData) return;
+      if (!("speechSynthesis" in window)) {
+        alert("Text-to-speech isn't supported in this browser.");
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(buildSpokenScript(lastCritiqueData));
+      utterance.rate = 1;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    async function copySummary() {
+      if (!lastCritiqueData) return;
+      const text = buildSpokenScript(lastCritiqueData);
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("Summary copied to clipboard");
+      } catch {
+        showToast("Couldn't copy — try selecting manually");
+      }
+    }
+
+    // ---------- Shareable links ----------
+    function encodeSharePayload(argument, data) {
+      const json = JSON.stringify({ a: argument, d: data });
+      return btoa(encodeURIComponent(json));
+    }
+
+    function decodeSharePayload(encoded) {
+      const json = decodeURIComponent(atob(encoded));
+      return JSON.parse(json);
+    }
+
+    async function shareCritique() {
+      if (!lastCritiqueData) return;
+      const encoded = encodeSharePayload(lastCritiqueArgument, lastCritiqueData);
+      const url = `${window.location.origin}${window.location.pathname}#s=${encoded}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast("Share link copied to clipboard");
+      } catch {
+        showToast("Couldn't copy the link — copy it from the address bar");
+        window.location.hash = `s=${encoded}`;
+      }
+    }
+
+    function renderSharedBanner(argument) {
+      const banner = document.createElement("div");
+      banner.className = "shared-banner";
+      banner.innerHTML = `You're viewing a shared critique. <a href="${window.location.origin}${window.location.pathname}" onclick="return true;">Analyze your own argument →</a>`;
+      document.getElementById("results").before(banner);
+      document.getElementById("argument").value = argument;
+      updateCharCount();
+    }
+
+    function loadSharedCritiqueFromUrl() {
+      const hash = window.location.hash;
+      if (!hash.startsWith("#s=")) return false;
+      try {
+        const encoded = hash.slice(3);
+        const { a, d } = decodeSharePayload(encoded);
+        lastCritiqueData = d;
+        lastCritiqueArgument = a;
+        renderSharedBanner(a);
+        renderResults(d, false);
+        return true;
+      } catch (e) {
+        console.error("Failed to load shared critique:", e);
+        return false;
+      }
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = String(str ?? '');
+      return div.innerHTML;
+    }
+
+    function gaugeColor(score) {
+      if (score <= 3) return getComputedStyle(document.documentElement).getPropertyValue('--red-bright');
+      if (score <= 6) return getComputedStyle(document.documentElement).getPropertyValue('--gold-bright');
+      return getComputedStyle(document.documentElement).getPropertyValue('--green-bright');
+    }
+
+    function animateGauge(el, numberEl, targetScore) {
+      const targetPct = Math.max(0, Math.min(10, targetScore)) * 10;
+      const color = gaugeColor(targetScore);
+      el.style.setProperty('--gauge-color', color);
+      const duration = 900;
+      const start = performance.now();
+
+      function tick(now) {
+        const t = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        el.style.setProperty('--pct', (targetPct * eased).toFixed(1));
+        numberEl.textContent = (targetScore * eased).toFixed(1).replace(/\.0$/, '');
+        if (t < 1) requestAnimationFrame(tick);
+        else numberEl.textContent = targetScore;
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function renderScanningState() {
+      document.getElementById("results").innerHTML = `
+        <div class="scan">
+          <div class="scan-track">
+            <div class="scan-lens">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+          </div>
+          <p class="scan-text" id="scanText">Scanning for fault lines&hellip;</p>
+        </div>`;
+    }
+
+    // If the request is taking a while, the Render free instance is likely
+    // waking up from an idle sleep — tell the person what's actually happening
+    // instead of leaving them staring at a generic spinner.
+    function startColdStartHint() {
+      const timers = [];
+      timers.push(setTimeout(() => {
+        const el = document.getElementById("scanText");
+        if (el) el.textContent = "Still working — the server may be waking up from idle…";
+      }, 6000));
+      timers.push(setTimeout(() => {
+        const el = document.getElementById("scanText");
+        if (el) el.textContent = "Almost there — first request after inactivity can take up to a minute.";
+      }, 16000));
+      return () => timers.forEach(clearTimeout);
+    }
+
+    function renderResults(data, animate = true) {
+      const resultsDiv = document.getElementById("results");
+      const score = Number(data.score) || 0;
+
+      let html = `<div class="result-card">`;
+      html += `
+        <div class="gauge-wrap">
+          <div class="gauge" id="gaugeEl">
+            <div class="gauge-inner">
+              <div class="gauge-score" id="gaugeScore">${animate ? '0' : score}</div>
+              <div class="gauge-max">/ 10</div>
+            </div>
+          </div>
+          <div class="gauge-label">Argument Score</div>
+        </div>
+        <div class="action-row">
+          <button class="btn btn-outline" onclick="readCritiqueAloud()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+            Read Aloud
+          </button>
+          <button class="btn btn-outline" onclick="copySummary()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy Summary
+          </button>
+          <button class="btn btn-outline" onclick="shareCritique()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>
+            Share
+          </button>
+        </div>`;
+
+      if (data.strong_points?.length) {
+        html += `
+          <div class="section-block">
+            <p class="section-title"><span class="dot dot-green"></span>Strong Points</p>
+            <ul class="point-list strong">${data.strong_points.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
+          </div>`;
+      }
+      if (data.weak_points?.length) {
+        html += `
+          <div class="section-block">
+            <p class="section-title"><span class="dot dot-red"></span>Weak Points</p>
+            <ul class="point-list weak">${data.weak_points.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
+          </div>`;
+      }
+      if (data.fallacies?.length) {
+        html += `
+          <div class="section-block">
+            <p class="section-title"><span class="dot dot-red"></span>Fallacies Detected</p>
+            ${data.fallacies.map(f => `
+              <div class="fallacy-card">
+                <span class="fallacy-type">${escapeHtml(f.type)}</span>
+                <p class="fallacy-quote">&ldquo;${escapeHtml(f.quote)}&rdquo;</p>
+                <p class="fallacy-explanation">${escapeHtml(f.explanation)}</p>
+              </div>`).join('')}
+          </div>`;
+      }
+      html += `</div>`;
+      resultsDiv.innerHTML = html;
+
+      if (animate) {
+        animateGauge(document.getElementById("gaugeEl"), document.getElementById("gaugeScore"), score);
+      } else {
+        document.getElementById("gaugeEl").style.setProperty('--gauge-color', gaugeColor(score));
+        document.getElementById("gaugeEl").style.setProperty('--pct', (score * 10).toFixed(1));
+      }
+    }
+
+    async function critique() {
+      const argument = document.getElementById("argument").value;
+      const resultsDiv = document.getElementById("results");
+
+      if (!argument.trim()) {
+        resultsDiv.innerHTML = `<p class="placeholder-hint">Write or speak an argument first — then we'll take a look.</p>`;
+        return;
+      }
+
+      lastCritiqueData = null;
+      renderScanningState();
+      const stopColdStartHint = startColdStartHint();
+
+      try {
+        const response = await fetch(BACKEND_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ argument: argument })
+        });
+
+        stopColdStartHint();
+        const rawText = await response.text();
+
+        if (response.status === 429) {
+          resultsDiv.innerHTML = `<div class="notice-box">You're sending requests a little fast — take a breath and try again in a minute.</div>`;
+          return;
+        }
+        if (!response.ok) throw new Error(rawText);
+
+        const groqData = JSON.parse(rawText);
+        const contentString = groqData.choices[0].message.content;
+        const data = JSON.parse(contentString);
+        lastCritiqueData = data;
+        lastCritiqueArgument = argument;
+
+        renderResults(data, true);
+        saveToHistory(argument, data);
+
+      } catch (error) {
+        stopColdStartHint();
+        console.error("Failed to fetch critique:", error);
+        resultsDiv.innerHTML = `<div class="error-box">Something went wrong: ${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    // ---------- Multi-agent debate ----------
+    function renderDebateScanningState() {
+      document.getElementById("results").innerHTML = `
+        <div class="scan">
+          <div class="scan-track">
+            <div class="scan-lens">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+          </div>
+          <p class="scan-text" id="scanText">Two AIs are arguing it out&hellip;</p>
+        </div>`;
+    }
+
+    function renderDebateResults(data) {
+      const resultsDiv = document.getElementById("results");
+      let html = `<div class="result-card">`;
+
+      html += `
+        <div class="section-block">
+          <p class="section-title"><span class="dot dot-green"></span>Agent A &middot; ${escapeHtml(data.agentA.model)}</p>
+          <div class="fallacy-card" style="border-left-color: var(--gold-bright);">
+            <span class="fallacy-type" style="color: var(--gold-bright); background: rgba(201,162,39,0.14);">Opening</span>
+            <p class="fallacy-explanation">${escapeHtml(data.agentA.opening)}</p>
+          </div>
+          <div class="fallacy-card" style="border-left-color: var(--gold-bright);">
+            <span class="fallacy-type" style="color: var(--gold-bright); background: rgba(201,162,39,0.14);">Rebuttal</span>
+            <p class="fallacy-explanation">${escapeHtml(data.agentA.rebuttal)}</p>
+          </div>
+        </div>
+
+        <div class="section-block">
+          <p class="section-title"><span class="dot dot-red"></span>Agent B &middot; ${escapeHtml(data.agentB.model)}</p>
+          <div class="fallacy-card">
+            <span class="fallacy-type">Opening</span>
+            <p class="fallacy-explanation">${escapeHtml(data.agentB.opening)}</p>
+          </div>
+          <div class="fallacy-card">
+            <span class="fallacy-type">Rebuttal</span>
+            <p class="fallacy-explanation">${escapeHtml(data.agentB.rebuttal)}</p>
+          </div>
+        </div>
+
+        <div class="notice-box" style="white-space: pre-wrap;">${escapeHtml(data.verdict)}</div>
+      `;
+
+      html += `</div>`;
+      resultsDiv.innerHTML = html;
+    }
+
+    async function runDebate() {
+      const argument = document.getElementById("argument").value;
+      const resultsDiv = document.getElementById("results");
+
+      if (!argument.trim()) {
+        resultsDiv.innerHTML = `<p class="placeholder-hint">Write or speak an argument first — then let the AIs debate it.</p>`;
+        return;
+      }
+
+      renderDebateScanningState();
+      const stopColdStartHint = startColdStartHint();
+
+      try {
+        const response = await fetch(DEBATE_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ argument: argument })
+        });
+
+        stopColdStartHint();
+        const rawText = await response.text();
+
+        if (response.status === 429) {
+          resultsDiv.innerHTML = `<div class="notice-box">You're sending requests a little fast — take a breath and try again in a minute.</div>`;
+          return;
+        }
+        if (!response.ok) throw new Error(rawText);
+
+        const data = JSON.parse(rawText);
+        renderDebateResults(data);
+
+      } catch (error) {
+        stopColdStartHint();
+        console.error("Failed to run debate:", error);
+        resultsDiv.innerHTML = `<div class="error-box">Something went wrong: ${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    // ---------- Keyboard shortcut: Ctrl/Cmd+Enter ----------
+    document.getElementById("argument").addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        critique();
+      }
+    });
+
+    // ---------- Init ----------
+    renderHistoryBadge();
+    loadSharedCritiqueFromUrl();
+  </script>
+</body>
+</html>
