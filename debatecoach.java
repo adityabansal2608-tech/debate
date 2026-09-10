@@ -200,10 +200,15 @@ public class debatecoach {
     // returns just the plain-text reply (unlike getCritiqueFromGroq, which
     // returns the raw Groq JSON for JSON-mode responses).
     static String callGroqText(String model, String systemPrompt, String userMessage) throws Exception {
+        // Prompts ask for ~100-120 word replies, but reasoning models like
+        // qwen3.6 can otherwise try to emit far more (reasoning + answer)
+        // and blow past this org's per-model OTPM rate limit. Capping
+        // max_tokens keeps every call comfortably under that limit.
         String jsonPayload = """
             {
               "model": "%s",
               "reasoning_format": "hidden",
+              "max_tokens": 400,
               "messages": [
                 {"role": "system", "content": "%s"},
                 {"role": "user", "content": "%s"}
@@ -464,6 +469,7 @@ public class debatecoach {
             {
               "model": "%s",
               "reasoning_format": "hidden",
+              "max_tokens": 400,
               "messages": %s,
               "temperature": 0.6
             }
