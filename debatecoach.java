@@ -18,9 +18,12 @@ public class debatecoach {
     // Securely read API Key from Environment Variable set in Railway dashboard
     static final String GROQ_API_KEY = System.getenv("GROQ_API_KEY");
 
+    // Note: llama-3.3-70b-versatile was deprecated by Groq in June 2026.
+    // This is the model used by /critique.
+    static final String CRITIQUE_MODEL = "openai/gpt-oss-120b";
+
     // Multi-agent debate: two different Groq models argue, a third judges.
-    // Note: llama-3.3-70b-versatile (used by /critique above) was deprecated
-    // by Groq in June 2026. These three are current as of this build.
+    // These three are current as of this build.
     static final String DEBATE_AGENT_A_MODEL = "openai/gpt-oss-120b";
     static final String DEBATE_AGENT_B_MODEL = "qwen/qwen3.6-27b";
     static final String DEBATE_JUDGE_MODEL = "openai/gpt-oss-120b";
@@ -548,7 +551,7 @@ public class debatecoach {
 
         String jsonPayload = """
             {
-              "model": "llama-3.3-70b-versatile",
+              "model": "%s",
               "response_format": { "type": "json_object" },
               "messages": [
                 {"role": "system", "content": "%s"},
@@ -556,7 +559,7 @@ public class debatecoach {
               ],
               "temperature": 0.2
             }
-            """.formatted(escapeJson(systemPrompt), escapeJson(argument));
+            """.formatted(CRITIQUE_MODEL, escapeJson(systemPrompt), escapeJson(argument));
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
